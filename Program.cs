@@ -5,244 +5,241 @@ using System.Linq;
 
 namespace HashCode2018
 {
-	public class Program
-	{
-		private const string FILE = "a_example.in";
-		private static List<string> _files = new List<string>
-		{
-			"a_example.in", "b_should_be_easy.in", "c_no_hurry.in", "d_metropolis.in", "e_high_bonus.in"
-		};
+    public class Program
+    {
+        private const string FILE = "a_example.in";
+        private static List<string> _files = new List<string>
+        {
+            "a_example.in", "b_should_be_easy.in", "c_no_hurry.in", "d_metropolis.in", "e_high_bonus.in"
+        };
 
-		static void RunFile(string file)
-		{
-			Console.WriteLine($"Start {file}");
+        static void RunFile(string file)
+        {
+            Console.WriteLine($"Start {file}");
 
-			Problem problem = Input(file);
+            Problem problem = Input(file);
 
-			Solution solution = new Solution(problem);
-			solution.Solve();
+            Solution solution = new Solution(problem);
+            solution.Solve();
 
-			Output(file, problem.Vehicles);
-			
-			Console.WriteLine("Done!");
-		}
-		
-		static void Main(string[] args)
-		{
-			foreach (string file in _files)
-			{
-				RunFile(file);
-			}
-		}
+            Output(file, problem.Vehicles);
 
-		static Problem Input(string file)
-		{
-			const int HEADER_COUNT = 1;
-			string[] lines = ReadFile(file);
+            Console.WriteLine($"Done {file}!");
+        }
 
-			List<int> values = lines[0].Split(' ').Select(int.Parse).ToList();
-			Problem result = new Problem
-			{
-				Vehicles = Enumerable.Range(0, values[2]).Select(_ => new Vehicle()).ToList(),
-				Bonus = values[4],
-				StepCount = values[5]
-			};
+        static void Main(string[] args)
+        {
+            _files.AsParallel().ForAll(RunFile);
+        }
 
-			int counter = 0;
-			foreach (string line in lines.Skip(HEADER_COUNT))
-			{
-				values = line.Split(' ').Select(int.Parse).ToList();
-				result.Rides.Add(new Ride
-				{
-					Id = counter++,
-					StartX = values[0],
-					StartY = values[1],
-					EndX = values[2],
-					EndY = values[3],
-					StartStep = values[4],
-					EndStep = values[5],
-				});
-			}
+        static Problem Input(string file)
+        {
+            const int HEADER_COUNT = 1;
+            string[] lines = ReadFile(file);
 
-			return result;
-		}
+            List<int> values = lines[0].Split(' ').Select(int.Parse).ToList();
+            Problem result = new Problem
+            {
+                Vehicles = Enumerable.Range(0, values[2]).Select(_ => new Vehicle()).ToList(),
+                Bonus = values[4],
+                StepCount = values[5]
+            };
 
-		static void Output(string file, List<Vehicle> data)
-		{
-			List<string> lines = data.Select(x => $"{x.Rides.Count} {string.Join(" ", x.Rides)}").ToList();
+            int counter = 0;
+            foreach (string line in lines.Skip(HEADER_COUNT))
+            {
+                values = line.Split(' ').Select(int.Parse).ToList();
+                result.Rides.Add(new Ride
+                {
+                    Id = counter++,
+                    StartX = values[0],
+                    StartY = values[1],
+                    EndX = values[2],
+                    EndY = values[3],
+                    StartStep = values[4],
+                    EndStep = values[5],
+                });
+            }
 
-			WriteFile(file, lines);
-		}
+            return result;
+        }
 
-		static string[] ReadFile(string file)
-		{
-			return File.ReadAllLines(file);
-		}
+        static void Output(string file, List<Vehicle> data)
+        {
+            List<string> lines = data.Select(x => $"{x.Rides.Count} {string.Join(" ", x.Rides)}").ToList();
 
-		static void WriteFile(string file, List<string> lines)
-		{
-			File.WriteAllText($"{file}.out", string.Join("\n", lines));
-		}
-	}
+            WriteFile(file, lines);
+        }
 
-	public class Node
-	{
-		public Node()
-		{
-			Links = new List<(int, Node)>();
-		}
+        static string[] ReadFile(string file)
+        {
+            return File.ReadAllLines(file);
+        }
 
-		public bool Done { get; set; }
+        static void WriteFile(string file, List<string> lines)
+        {
+            File.WriteAllText($"{file}.out", string.Join("\n", lines));
+        }
+    }
 
-		public Ride Ride { get; set; }
+    public class Node
+    {
+        public Node()
+        {
+            Links = new List<(int, Node)>();
+        }
 
-		public bool IsStart { get; set; }
+        public bool Done { get; set; }
 
-		public List<(int, Node)> Links { get; set; }
-	}
+        public Ride Ride { get; set; }
 
-	public class Solution
-	{
-		private readonly Problem _problem;
-		private int _currentStep = 0;
+        public bool IsStart { get; set; }
 
-		public Solution(Problem problem)
-		{
-			_problem = problem;
+        public List<(int, Node)> Links { get; set; }
+    }
 
-			_problem.Rides.ForEach(x => x.Distance = Distance(x));
-		}
+    public class Solution
+    {
+        private readonly Problem _problem;
+        private int _currentStep = 0;
 
-		private Node CreateNode()
-		{
-			Node startNode = new Node
-			{
-				Ride = null,
-			};
+        public Solution(Problem problem)
+        {
+            _problem = problem;
 
-			List<Node> endNodes = new List<Node>();
-			startNode.Links.AddRange(_problem.Rides.Select(ride =>
-			{
-				Node startRide = new Node
-				{
-					Ride = ride,
-					IsStart = true,
-				};
+            _problem.Rides.ForEach(x => x.Distance = Distance(x));
+        }
 
-				startRide.Links.Add((ride.Distance, new Node
-				{
-					Ride = ride,
-					IsStart = false,
-				}));
-				endNodes.Add(startRide.Links[0].Item2);
-				return (DistanceStart(ride), startRide);
-			}));
+        private Node CreateNode()
+        {
+            Node startNode = new Node
+            {
+                Ride = null,
+            };
 
-			foreach (Node startTrip in startNode.Links.Select(x => x.Item2))
-			{
-				foreach (Node endTrip in endNodes)
-				{
-					if (startTrip.Ride != endTrip.Ride)
-					{
-						endTrip.Links.Add((Distance(endTrip.Ride, startTrip.Ride), startTrip));
-					}
-				}
-			}
+            List<Node> endNodes = new List<Node>();
+            startNode.Links.AddRange(_problem.Rides.Select(ride =>
+            {
+                Node startRide = new Node
+                {
+                    Ride = ride,
+                    IsStart = true,
+                };
 
-			return startNode;
-		}
+                startRide.Links.Add((ride.Distance, new Node
+                {
+                    Ride = ride,
+                    IsStart = false,
+                }));
+                endNodes.Add(startRide.Links[0].Item2);
+                return (DistanceStart(ride), startRide);
+            }));
 
-		public void Solve()
-		{
-			Node start = CreateNode();
-			_problem.Vehicles.ForEach(x => x.Node = start);
+            foreach (Node startTrip in startNode.Links.Select(x => x.Item2))
+            {
+                foreach (Node endTrip in endNodes)
+                {
+                    if (startTrip.Ride != endTrip.Ride)
+                    {
+                        endTrip.Links.Add((Distance(endTrip.Ride, startTrip.Ride), startTrip));
+                    }
+                }
+            }
 
-			for (var i = 0; i < _problem.StepCount; i++)
-			{
-				foreach (Vehicle v in _problem.Vehicles)
-				{
-					if (v.CurrentStep <= i)
-					{
-						AffectVehicle(v);
-					}
-				}
-			}
-		}
+            return startNode;
+        }
 
-		public void AffectVehicle(Vehicle v)
-		{
-			Node next = null;
-			int distanceToNode = 0;
-			int maxScore = -100_000_000;
+        public void Solve()
+        {
+            Node start = CreateNode();
+            _problem.Vehicles.ForEach(x => x.Node = start);
 
-			foreach ((int distance, Node node) in v.Node.Links)
-			{
-				if (IsUsable(v.Node, distance, node))
-				{
-					int result = Score(v.Node, distance, node);
+            for (var i = 0; i < _problem.StepCount; i++)
+            {
+                foreach (Vehicle v in _problem.Vehicles)
+                {
+                    if (v.CurrentStep <= i)
+                    {
+                        AffectVehicle(v);
+                    }
+                }
+            }
+        }
 
-					if (maxScore < result)
-					{
-						distanceToNode = distance;
-						maxScore = result;
-						next = node;
-					}
-				}
-			}
+        public void AffectVehicle(Vehicle v)
+        {
+            Node next = null;
+            int distanceToNode = 0;
+            int maxScore = -100_000_000;
 
-			if (next == null)
-			{
-				v.Finished = true;
-			}
-			else
-			{
-				v.Rides.Add(next.Ride.Id);
-				v.CurrentStep += distanceToNode + next.Ride.Distance;
-				next.Done = true;
-				v.Node = next.Links[0].Item2;
-				v.Node.Done = true;
-			}
-		}
+            foreach ((int distance, Node node) in v.Node.Links)
+            {
+                if (IsUsable(v.Node, distance, node))
+                {
+                    int result = Score(v.Node, distance, node);
 
-		public bool IsUsable(Node x, int distance, Node y)
-		{
-			if (y.Done)
-			{
-				return false;
-			}
+                    if (maxScore < result)
+                    {
+                        distanceToNode = distance;
+                        maxScore = result;
+                        next = node;
+                    }
+                }
+            }
 
-			if (y.IsStart)
-			{
-				int tripDistance = y.Links[0].Item1;
+            if (next == null)
+            {
+                v.Finished = true;
+            }
+            else
+            {
+                v.Rides.Add(next.Ride.Id);
+                v.CurrentStep += distanceToNode + next.Ride.Distance;
+                next.Done = true;
+                v.Node = next.Links[0].Item2;
+                v.Node.Done = true;
+            }
+        }
 
-				if (distance + tripDistance + _currentStep >= y.Ride.EndStep)
-				{
-					return false;
-				}
-			}
+        public bool IsUsable(Node x, int distance, Node y)
+        {
+            if (y.Done)
+            {
+                return false;
+            }
 
-			return true;
-		}
+            if (y.IsStart)
+            {
+                int tripDistance = y.Links[0].Item1;
 
-		public int Score(Node x, int distance, Node y)
-		{
-			int tripDistance = y.Links[0].Item1;
-			return distance - tripDistance;
-		}
+                if (distance + tripDistance + _currentStep >= y.Ride.EndStep)
+                {
+                    return false;
+                }
+            }
 
-		public static int DistanceStart(Ride r)
-		{
-			return Math.Abs(r.StartX) + Math.Abs(r.StartY);
-		}
+            return true;
+        }
 
-		public static int Distance(Ride r1, Ride r2)
-		{
-			return Math.Abs(r1.EndX - r2.StartX) + Math.Abs(r1.EndY - r2.StartY);
-		}
+        public int Score(Node x, int distance, Node y)
+        {
+            int tripDistance = y.Links[0].Item1;
+            return distance - tripDistance;
+        }
 
-		public static int Distance(Ride r)
-		{
-			return Math.Abs(r.EndX - r.StartX) + Math.Abs(r.EndY - r.StartY);
-		}
-	}
+        public static int DistanceStart(Ride r)
+        {
+            return Math.Abs(r.StartX) + Math.Abs(r.StartY);
+        }
+
+        public static int Distance(Ride r1, Ride r2)
+        {
+            return Math.Abs(r1.EndX - r2.StartX) + Math.Abs(r1.EndY - r2.StartY);
+        }
+
+        public static int Distance(Ride r)
+        {
+            return Math.Abs(r.EndX - r.StartX) + Math.Abs(r.EndY - r.StartY);
+        }
+    }
 }
