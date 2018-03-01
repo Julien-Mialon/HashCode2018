@@ -157,8 +157,21 @@ namespace HashCode2018
 			Node start = CreateNode();
 			_problem.Vehicles.ForEach(x => x.Node = start);
 
+			List<Vehicle> vehicles = _problem.Vehicles.ToArray().ToList();
 			for (var i = 0; i < _problem.StepCount; i++)
 			{
+				_currentStep = i;
+				for (var j = 0; j < vehicles.Count; j++)
+				{
+					Vehicle v = vehicles[j];
+					AffectVehicle(v);
+
+					if (v.Finished)
+					{
+						vehicles.RemoveAt(j);
+					}
+				}
+
 				foreach (Vehicle v in _problem.Vehicles)
 				{
 					if (v.CurrentStep <= i)
@@ -198,6 +211,12 @@ namespace HashCode2018
 			{
 				v.Rides.Add(next.Ride.Id);
 				v.CurrentStep += distanceToNode + next.Ride.Distance;
+
+				int arrival = _currentStep + distanceToNode;
+				if (arrival < next.Ride.StartStep)
+				{
+					v.CurrentStep += (next.Ride.StartStep - arrival);
+				}
 				next.Done = true;
 				v.Node = next.Links[0].Item2;
 				v.Node.Done = true;
@@ -215,7 +234,14 @@ namespace HashCode2018
 			{
 				int tripDistance = y.Links[0].Item1;
 
-				if (distance + tripDistance + _currentStep >= y.Ride.EndStep)
+				int arrival = _currentStep + distance;
+				int add = 0;
+				if (arrival < y.Ride.StartStep)
+				{
+					add = (y.Ride.StartStep - arrival);
+				}
+				
+				if (add + distance + tripDistance + _currentStep >= y.Ride.EndStep)
 				{
 					return false;
 				}
@@ -227,7 +253,13 @@ namespace HashCode2018
 		public int Score(Node x, int distance, Node y)
 		{
 			int tripDistance = y.Links[0].Item1;
-			return distance - tripDistance;
+			int arrival = _currentStep + distance;
+			int add = 0;
+			if (arrival < y.Ride.StartStep)
+			{
+				add = (y.Ride.StartStep - arrival);
+			}
+			return tripDistance - (distance + add);
 		}
 
 		public static int DistanceStart(Ride r)
