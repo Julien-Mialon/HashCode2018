@@ -8,9 +8,14 @@ namespace HashCode2018
 	public class Program
 	{
 		private const string FILE = "a_example.in";
+
 		private static List<string> _files = new List<string>
 		{
-			"a_example.in", "b_should_be_easy.in", "c_no_hurry.in", "d_metropolis.in", "e_high_bonus.in"
+			"a_example.in",
+			"b_should_be_easy.in",
+			"c_no_hurry.in",
+			"d_metropolis.in",
+			"e_high_bonus.in"
 		};
 
 		static void RunFile(string file)
@@ -23,10 +28,10 @@ namespace HashCode2018
 			solution.Solve();
 
 			Output(file, problem.Vehicles);
-			
+
 			Console.WriteLine("Done!");
 		}
-		
+
 		static void Main(string[] args)
 		{
 			foreach (string file in _files)
@@ -158,25 +163,24 @@ namespace HashCode2018
 			_problem.Vehicles.ForEach(x => x.Node = start);
 
 			List<Vehicle> vehicles = _problem.Vehicles.ToArray().ToList();
-			for (var i = 0; i < _problem.StepCount; i++)
+			for (int stepIndex = 0; stepIndex < _problem.StepCount; stepIndex++)
 			{
-				_currentStep = i;
+				_currentStep = stepIndex;
 				for (var j = 0; j < vehicles.Count; j++)
 				{
 					Vehicle v = vehicles[j];
+
+					if (v.CurrentStep > stepIndex)
+					{
+						continue;
+					}
+
 					AffectVehicle(v);
 
 					if (v.Finished)
 					{
 						vehicles.RemoveAt(j);
-					}
-				}
-
-				foreach (Vehicle v in _problem.Vehicles)
-				{
-					if (v.CurrentStep <= i)
-					{
-						AffectVehicle(v);
+						j--;
 					}
 				}
 			}
@@ -188,11 +192,12 @@ namespace HashCode2018
 			int distanceToNode = 0;
 			int maxScore = -100_000_000;
 
-			foreach ((int distance, Node node) in v.Node.Links)
+			Node start = v.Node;
+			foreach ((int distance, Node node) in start.Links)
 			{
-				if (IsUsable(v.Node, distance, node))
+				if (IsUsable(start, distance, node))
 				{
-					int result = Score(v.Node, distance, node);
+					int result = Score(start, distance, node);
 
 					if (maxScore < result)
 					{
@@ -210,15 +215,19 @@ namespace HashCode2018
 			else
 			{
 				v.Rides.Add(next.Ride.Id);
+
 				v.CurrentStep += distanceToNode + next.Ride.Distance;
 
+				//add waiting time before ride
 				int arrival = _currentStep + distanceToNode;
 				if (arrival < next.Ride.StartStep)
 				{
-					v.CurrentStep += (next.Ride.StartStep - arrival);
+					v.CurrentStep += next.Ride.StartStep - arrival;
 				}
-				next.Done = true;
+
+				//mark start & end node as "Done"
 				v.Node = next.Links[0].Item2;
+				next.Done = true;
 				v.Node.Done = true;
 			}
 		}
@@ -232,16 +241,17 @@ namespace HashCode2018
 
 			if (y.IsStart)
 			{
-				int tripDistance = y.Links[0].Item1;
-
+				int tripDistance = y.Ride.Distance;
 				int arrival = _currentStep + distance;
+
+				//add time before beginning
 				int add = 0;
 				if (arrival < y.Ride.StartStep)
 				{
-					add = (y.Ride.StartStep - arrival);
+					add = y.Ride.StartStep - arrival;
 				}
-				
-				if (add + distance + tripDistance + _currentStep >= y.Ride.EndStep)
+
+				if (arrival + add + tripDistance >= y.Ride.EndStep)
 				{
 					return false;
 				}
@@ -252,14 +262,24 @@ namespace HashCode2018
 
 		public int Score(Node x, int distance, Node y)
 		{
-			int tripDistance = y.Links[0].Item1;
+			int tripDistance = y.Ride.Distance;
 			int arrival = _currentStep + distance;
 			int add = 0;
+			//add time before ride begin
 			if (arrival < y.Ride.StartStep)
 			{
-				add = (y.Ride.StartStep - arrival);
+				add = y.Ride.StartStep - arrival;
 			}
-			return tripDistance - (distance + add);
+
+			//add bonus point
+			int bonus = 0;
+			if (arrival <= y.Ride.StartStep)
+			{
+				bonus = _problem.Bonus;
+			}
+
+			// trajet + bonus - (temps avant démarrage)
+			return tripDistance + bonus - (distance + add);
 		}
 
 		public static int DistanceStart(Ride r)
