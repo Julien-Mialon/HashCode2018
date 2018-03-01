@@ -13,34 +13,47 @@ namespace HashCode2018
         {
             Console.WriteLine("Hello World!");
 
-            Input(FILE);
+            Problem problem = Input(FILE);
 
-            int data = 2;
-            Output(FILE, data);
+            Output(FILE, problem.Vehicles);
         }
 
-        static void Input(string file)
+        static Problem Input(string file)
         {
             const int HEADER_COUNT = 1;
             string[] lines = ReadFile(file);
 
-            //TODO: read header
-            
+            List<int> values = lines[0].Split(' ').Select(int.Parse).ToList();
+            Problem result = new Problem
+            {
+                Vehicles = Enumerable.Range(0, values[2]).Select(_ => new Vehicle()).ToList(),
+                Bonus = values[4],
+                StepCount = values[5]
+            };
+
+            int counter = 0;
             foreach (string line in lines.Skip(HEADER_COUNT))
             {
-                //TODO: read content
+                values = line.Split(' ').Select(int.Parse).ToList();
+                result.Rides.Add(new Ride
+                {
+                    Id = counter++,
+                    StartX = values[0],
+                    StartY = values[1],
+                    EndX = values[2],
+                    EndY = values[3],
+                    StartStep = values[4],
+                    EndStep = values[5],
+                });
             }
+
+            return result;
         }
 
-        static void Output(string file, int data)
+        static void Output(string file, List<Vehicle> data)
         {
-            List<string> lines = new List<string>();
+            List<string> lines = data.Select(x => $"{x.Rides.Count} {string.Join(" ", x.Rides)}").ToList();
             
-            //TODO: add header lines
-            
-            //TODO: write response lines 
-            lines.AddRange(Enumerable.Range(0, data).Select(x => x.ToString()));
-
             WriteFile(file, lines);
         }
 
