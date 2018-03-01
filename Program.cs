@@ -29,15 +29,13 @@ namespace HashCode2018
 
 			Output(file, problem.Vehicles);
 
-			Console.WriteLine("Done!");
+			Console.WriteLine($"Done! {file}");
 		}
 
 		static void Main(string[] args)
 		{
-			foreach (string file in _files)
-			{
-				RunFile(file);
-			}
+			//_files.AsParallel().ForAll(RunFile);
+			RunFile(FILE);
 		}
 
 		static Problem Input(string file)
@@ -110,12 +108,15 @@ namespace HashCode2018
 	{
 		private readonly Problem _problem;
 		private int _currentStep = 0;
+		private AffectSolver _solver;
+		private Dictionary<int, Node> _startNodesRides;
 
 		public Solution(Problem problem)
 		{
 			_problem = problem;
 
 			_problem.Rides.ForEach(x => x.Distance = Distance(x));
+			_solver = new AffectSolver(problem);
 		}
 
 		private Node CreateNode()
@@ -143,6 +144,8 @@ namespace HashCode2018
 				return (DistanceStart(ride), startRide);
 			}));
 
+			_startNodesRides = startNode.Links.ToDictionary(x => x.Item2.Ride.Id, x => x.Item2);
+
 			foreach (Node startTrip in startNode.Links.Select(x => x.Item2))
 			{
 				foreach (Node endTrip in endNodes)
@@ -166,16 +169,49 @@ namespace HashCode2018
 			for (int stepIndex = 0; stepIndex < _problem.StepCount; stepIndex++)
 			{
 				_currentStep = stepIndex;
+				List<Vehicle> vs = vehicles.Where(v => v.CurrentStep <= stepIndex).ToList();
+				List<Dictionary<int, int>> matrix = vs.Select(GetMatrix).ToList();
+
+				_solver.SetWeights(matrix);
+				List<int> bests = _solver.Path();
+				
+				for (var i = 0; i < bests.Count; i++)
+				{
+					int rideId = bests[i];
+					Vehicle v = vs[i];
+
+					if (rideId < 0)
+					{
+						v.Finished = true;
+						continue;
+					}
+					
+
+					Node startNode = _startNodesRides[rideId];
+					Node endNode = start.Links[0].Item2;
+					
+					v.Rides.Add(rideId);
+
+					int distanceToNode = matrix[i][rideId];
+					v.CurrentStep += distanceToNode + startNode.Ride.Distance;
+
+					//add waiting time before ride
+					int arrival = _currentStep + distanceToNode;
+					if (arrival < startNode.Ride.StartStep)
+					{
+						v.CurrentStep += startNode.Ride.StartStep - arrival;
+					}
+
+					//mark start & end node as "Done"
+					v.Node = endNode;
+					endNode.Done = true;
+					startNode.Done = true;
+					
+				}
+				
 				for (var j = 0; j < vehicles.Count; j++)
 				{
 					Vehicle v = vehicles[j];
-
-					if (v.CurrentStep > stepIndex)
-					{
-						continue;
-					}
-
-					AffectVehicle(v);
 
 					if (v.Finished)
 					{
@@ -230,6 +266,24 @@ namespace HashCode2018
 				next.Done = true;
 				v.Node.Done = true;
 			}
+		}
+		
+		public Dictionary<int, int> GetMatrix(Vehicle v)
+		{
+			Dictionary<int, int> result = new Dictionary<int, int>();
+			Node start = v.Node;
+
+			foreach ((int distance, Node node) in start.Links)
+			{
+				result[node.Ride.Id] = -100_000_000;
+				if (IsUsable(start, distance, node))
+				{
+					int score = Score(start, distance, node);
+					result[node.Ride.Id] = score;
+				}
+			}
+
+			return result;
 		}
 
 		public bool IsUsable(Node x, int distance, Node y)
@@ -295,6 +349,152 @@ namespace HashCode2018
 		public static int Distance(Ride r)
 		{
 			return Math.Abs(r.EndX - r.StartX) + Math.Abs(r.EndY - r.StartY);
+		}
+	}
+
+	public class SolverNode
+	{
+		public SolverNode()
+		{
+			Links = new List<SolverNode>();
+		}
+
+		public Ride Ride;
+
+		public int Weight { get; set; }
+		
+		public int Cost { get; set; }
+		
+		public bool IsOpened { get; set; }
+		
+		public SolverNode Backtrack { get; set; }
+
+		public List<SolverNode> Links { get; set; }
+	}
+
+	public class AffectSolver
+	{
+		private SolverNode _startNode;
+		private SolverNode _endNode;
+
+		private List<Dictionary<int, SolverNode>> _nodes;
+
+		public AffectSolver(Problem problem)
+		{
+			_startNode = new SolverNode();
+			_endNode = new SolverNode();
+
+			_nodes = problem.Vehicles.Select(_ =>
+			{
+				return problem.Rides.ToDictionary(x => x.Id, x => new SolverNode
+				{
+					Ride = x,
+					Weight = -100_000_000,
+				});
+			}).ToList();
+
+			_startNode.Links.AddRange(_nodes[0].Values);
+			
+			for (var i = 0; i < _nodes.Count; i++)
+			{
+				var items = _nodes[i];
+				if (i + 1 < _nodes.Count)
+				{
+					foreach (SolverNode item in items.Values)
+					{
+						item.Links.AddRange(_nodes[i + 1].Values);
+					}
+				}
+				else
+				{
+					foreach (SolverNode item in items.Values)
+					{
+						item.Links.Add(_endNode);
+					}
+				}
+			}
+		}
+		
+		public void SetWeights(List<Dictionary<int, int>> weights)
+		{
+			for (var i = 0; i < _nodes.Count; i++)
+			{
+				var dest = _nodes[i];
+				var source = weights[i];
+				
+				foreach (KeyValuePair<int,int> bouh in source)
+				{
+					dest[bouh.Key].Weight = bouh.Value;
+				}
+			}
+		}
+
+		public List<int> Path()
+		{
+			List<SolverNode> opened = new List<SolverNode>() { _startNode };
+			HashSet<SolverNode> closed = new HashSet<SolverNode>();
+			_startNode.IsOpened = true;
+			List<int> result = new List<int>();
+			while (opened.Count > 0)
+			{
+				SolverNode current = opened[0];
+				opened.RemoveAt(0);
+
+				if (current == _endNode)
+				{
+					while (current != null)
+					{
+						current = current.Backtrack;
+						if (current != _startNode && current != null)
+						{
+							result.Insert(0, current.Weight == -100_000_000 ? -1 : current.Ride.Id);
+						}
+					}
+
+					return result;
+				}
+				
+				foreach (SolverNode currentLink in current.Links)
+				{
+					if (closed.Contains(currentLink))
+					{
+						continue;
+					}
+
+					if (currentLink.IsOpened)
+					{
+						if (current.Cost + currentLink.Weight < currentLink.Cost)
+						{
+							continue;
+						}
+					}
+
+					currentLink.Backtrack = current;
+					currentLink.Cost = current.Cost + currentLink.Weight;
+
+					bool added = false;
+					for (int i = 0; i < opened.Count; ++i)
+					{
+						if (opened[i].Cost < currentLink.Cost)
+						{
+							opened.Insert(i, currentLink);
+							added = true;
+							break;
+						}
+					}
+
+					if (!added)
+					{
+						opened.Add(currentLink);
+					}
+
+					currentLink.IsOpened = true;
+				}
+
+				closed.Add(current);
+			}
+
+			return result;
 		}
 	}
 }
