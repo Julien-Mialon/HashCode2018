@@ -1,56 +1,74 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace HashCode2018
 {
 	public class Problem
 	{
 		public int Bonus { get; set; }
-		
+
 		public int StepCount { get; set; }
-		
+
 		public List<Ride> Rides { get; set; }
-		
+
 		public List<Vehicle> Vehicles { get; set; }
 
 		public Problem()
 		{
 			Rides = new List<Ride>();
-			Vehicles =new List<Vehicle>();
+			Vehicles = new List<Vehicle>();
 		}
 	}
 
 	public class Ride
 	{
-		public int Id { get; set; }
-		
-		public int StartX { get; set; }
-		
-		public int StartY { get; set; }
-		
-		public int EndX { get; set; }
-		
-		public int EndY { get; set; }
-		
-		public int StartStep { get; set; }
-		
-		public int EndStep { get; set; }
-		
-		public int Distance { get; set; }
+		public readonly int StartX, StartY;
+
+		public readonly int EndX, EndY;
+
+		public readonly int StartStep, EndStep, Id, Distance;
+
+		public bool Done;
+
+		public Ride(int id, int startX, int startY, int endX, int endY, int startStep, int endStep)
+		{
+			StartX = startX;
+			StartY = startY;
+			EndX = endX;
+			EndY = endY;
+			StartStep = startStep;
+			EndStep = endStep;
+			Id = id;
+			Distance = Math.Abs(StartX - EndY) + Math.Abs(StartY - EndY);
+		}
+
+		public int DistanceToRide(Ride r) => Math.Abs(EndX - r.StartX) + Math.Abs(EndY - r.StartY);
+
+		public int Attente(int currentStep) => Math.Max(StartStep - currentStep, 0);
 	}
 
 	public class Vehicle
 	{
-		public int CurrentStep { get; set; }
-		
-		public bool Finished { get; set; }
-		
-		public List<int> Rides { get; set; }
+		public int NextPlayableStep { get; set; }
 
-		public Node Node { get; set; }
-		
+		public int CurrentX, CurrentY;
+
+		public List<int> Rides { get; }
+
 		public Vehicle()
 		{
 			Rides = new List<int>();
+		}
+
+		public bool IsDispo(int currentStep) => currentStep >= NextPlayableStep;
+
+		public int DistanceToRide(Ride r) => Math.Abs(CurrentX - r.StartX) + Math.Abs(CurrentY - r.StartY);
+
+		public void ToNextRide(Ride r, int currentStep)
+		{
+			var attente = r.Attente(currentStep);
+			r.Done = true;
+			NextPlayableStep = currentStep + r.Distance + DistanceToRide(r) + attente;
 		}
 	}
 }
