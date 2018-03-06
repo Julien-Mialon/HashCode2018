@@ -16,15 +16,23 @@ namespace HashCode2018
 	 
 	 
 	 https://github.com/antifriz/hungarian-algorithm-n3/blob/master/src/HungarianAlgorithm.cs
+
+max score
+  b = 180 798 (177 027)
+  c = 16 750 973
+  d = 14 272 704 (14 186 252)
+  e = 21 601 343 (21 568 975)
+max = 52 805 818 (+10)
+
 	 */
-	
+
 	public class Program
 	{
 		private const string FILE = "a_example.in";
 
 		private static List<string> _files = new List<string>
 		{
-			"a_example.in",
+			//"a_example.in",
 			"b_should_be_easy.in",
 			"c_no_hurry.in",
 			"d_metropolis.in",
@@ -38,31 +46,41 @@ namespace HashCode2018
 			Problem problem = Input(file);
 
 			Solution solution = new Solution(problem);
+			Stopwatch watcher = Stopwatch.StartNew();
 			solution.Solve();
+			long elapsed = watcher.ElapsedMilliseconds;
+			watcher.Stop();
 
-			Output(file, problem.Vehicles);
+			int score = solution.Score();
+			Output($"{file}.{score}", problem.Vehicles);
 
-			Console.WriteLine($"Done! {file}");
+			Console.WriteLine($"Done! {file} => {score} ({elapsed}ms)");
 		}
 
 		static void Main(string[] args)
 		{
 			//_files.AsParallel().ForAll(RunFile);
-			//RunFile(FILE);
+			RunFile(_files[0]);
+			RunFile(_files[1]);
+			RunFile(_files[2]);
+			RunFile(_files[3]);
 			
-			int[,] costMatrix = new int[,]
+			Console.ReadLine();
+		}
+
+		static int[][] Create(int height, int width)
+		{
+			Random random = new Random();
+			int[][] result = new int[height][];
+			for (var i = 0; i < height; i++)
 			{
-				{ 2, 3, 3, 1},
-				{ 3, 3, 2, 4 },
-				{ 3, 2, 3, 4 }
-			};
-			
-			Stopwatch watch = Stopwatch.StartNew();
-			HungarianAlgorithm algo = new HungarianAlgorithm(costMatrix);
-			int[] result = algo.Run();
-			
-			Console.WriteLine($"{watch.ElapsedMilliseconds}ms");
-			Console.WriteLine(string.Join(" ; ", result));
+				result[i] = new int[width];
+				for (var j = 0; j < width; j++)
+				{
+					result[i][j] = random.Next(0, 100);
+				}
+			}
+			return result;
 		}
 
 		static Problem Input(string file)
@@ -91,7 +109,7 @@ namespace HashCode2018
 					EndStep = values[5],
 				});
 			}
-			
+
 			Problem result = new Problem(bonus, stepCount, rides);
 			List<Vehicle> vehicles = new List<Vehicle>(vehiclesCount);
 			for (int i = 0; i < vehiclesCount; ++i)
@@ -139,21 +157,21 @@ namespace HashCode2018
 	public class Constant
 	{
 		public const int MIN = -100_000_000;
-		public const int BONUS_MULTIPLIER = 1;	
+		public const int BONUS_MULTIPLIER = 1;
 	}
-	
+
 	public class Problem
 	{
 		public int Bonus { get; }
-		
+
 		public int StepCount { get; }
-		
+
 		public List<Ride> Rides { get; }
-		
+
 		public List<Vehicle> Vehicles { get; set; }
 
 		public int CurrentStep { get; set; }
-		
+
 		public int[] NotUsableScores { get; }
 
 		public Problem(int bonus, int stepCount, List<Ride> rides)
@@ -161,55 +179,53 @@ namespace HashCode2018
 			Bonus = bonus;
 			StepCount = stepCount;
 			Rides = rides;
-			NotUsableScores = Rides.Select(_ => Constant.BONUS_MULTIPLIER).ToArray();
+			NotUsableScores = Rides.Select(_ => Constant.MIN).ToArray();
 		}
 	}
 
 	public class Ride
 	{
 		public int Id { get; set; }
-		
+
 		public int StartX { get; set; }
-		
+
 		public int StartY { get; set; }
-		
+
 		public int EndX { get; set; }
-		
+
 		public int EndY { get; set; }
-		
+
 		public int StartStep { get; set; }
-		
+
 		public int EndStep { get; set; }
-		
+
 		public int Distance { get; set; }
 	}
 
 	public class Vehicle
 	{
 		private readonly Problem _problem;
-		private readonly HashSet<int> _usableRides;
 		private readonly int[] _scores;
-		
+
 		public int Id { get; }
-		
+
 		public int CurrentStep { get; set; }
-		
+
 		public bool Finished { get; set; }
-		
+
 		public List<int> Rides { get; set; }
 
 		public Node Node { get; set; }
-		
+
 		public Vehicle(int id, Problem problem)
 		{
 			Id = id;
 			_problem = problem;
 			Rides = new List<int>();
 			_scores = problem.Rides.Select(_ => Constant.BONUS_MULTIPLIER).ToArray();
-			_usableRides = new HashSet<int>(problem.Rides.Select(x => x.Id));
 		}
 
-		public int[] UpdateNodesScore()
+		public int[] UpdateNodesScore(int[] scoreIndexMapping)
 		{
 			for (var i = 0; i < _scores.Length; i++)
 			{
@@ -220,24 +236,20 @@ namespace HashCode2018
 			{
 				(int distance, Node node) = Node.Links[index];
 				int id = node.Ride.Id;
-
-				if (_usableRides.Contains(id))
+				int scoreIndex = scoreIndexMapping[id];
+				if (scoreIndex < 0)
 				{
-					if (node.Done)
-					{
-						_usableRides.Remove(id);
-						continue;
-					}
-					
-					(bool result, int score) = GetScoreForNode(distance, node);
-
-					if (!result)
-					{
-						_usableRides.Remove(id);
-					}
-					
-					_scores[node.Ride.Id] = score;
+					continue;
 				}
+
+				(bool result, int score) = GetScoreForNode(distance, node);
+				if (!result)
+				{
+					continue;
+				}
+
+				_scores[scoreIndex] = score;
+
 			}
 
 			return _scores;
@@ -259,24 +271,29 @@ namespace HashCode2018
 			{
 				return (false, Constant.MIN);
 			}
-			
-			
+
+
 			//add bonus point
 			int bonus = 0;
 			if (arrival <= dest.Ride.StartStep)
 			{
 				bonus = _problem.Bonus;
 			}
-			
+
+			int score = tripDistance + bonus;
+			int waitingTime = add;
+
+			return (true, score - (distance + 10 * waitingTime));
+
 			// trajet + bonus - (temps perdu avant démarrage)
-			return (true, tripDistance + bonus*Constant.BONUS_MULTIPLIER - (distance + add));
+			return (true, tripDistance + bonus * Constant.BONUS_MULTIPLIER - (distance + add));
 		}
 	}
 
 	public class Solution
 	{
 		private readonly Problem _problem;
-
+		private List<Node> _rideNodes;
 		public Solution(Problem problem)
 		{
 			_problem = problem;
@@ -284,6 +301,24 @@ namespace HashCode2018
 			_problem.Rides.ForEach(x => x.Distance = Distance(x));
 			Node startNode = CreateNode();
 			_problem.Vehicles.ForEach(x => x.Node = startNode);
+
+			int max = _problem.Rides.Sum(x =>
+			{
+				int distanceFromStart = x.StartX + x.StartY;
+
+				if (distanceFromStart + x.Distance >= x.EndStep)
+				{
+					return 0;
+				}
+
+				if (x.Distance + x.StartStep >= x.EndStep)
+				{
+					return 0;
+				}
+
+				return x.Distance + _problem.Bonus;
+			});
+			Console.WriteLine($"Max score: {max}");
 		}
 
 		private Node CreateNode()
@@ -293,24 +328,24 @@ namespace HashCode2018
 				Ride = null,
 			};
 
-			List<Node> rideNodes = _problem.Rides.Select(ride => new Node
+			_rideNodes = _problem.Rides.Select(ride => new Node
 			{
 				Done = false,
 				Ride = ride,
 			}).ToList();
-			startNode.Links.AddRange(rideNodes.Select(node => (DistanceStart(node.Ride), node)));
+			startNode.Links.AddRange(_rideNodes.Select(node => (DistanceStart(node.Ride), node)));
 
-			for (int i = 0; i < rideNodes.Count; i++)
+			for (int i = 0; i < _rideNodes.Count; i++)
 			{
-				Node source = rideNodes[i];
-				for (int j = 0; j < rideNodes.Count; j++)
+				Node source = _rideNodes[i];
+				for (int j = 0; j < _rideNodes.Count; j++)
 				{
 					if (i == j)
 					{
 						continue;
 					}
 
-					Node dest = rideNodes[j];
+					Node dest = _rideNodes[j];
 
 					source.Links.Add((Distance(source.Ride, dest.Ride), dest));
 				}
@@ -323,60 +358,158 @@ namespace HashCode2018
 		{
 			List<Vehicle> vehicles = _problem.Vehicles.ToArray().ToList();
 			int[][] matrix = new int[vehicles.Count][];
+			int[] vehiclesMapping = new int[vehicles.Count];
+			int[] nodesMapping = new int[_problem.Rides.Count];
+			int[] invertNodesMapping = new int[_problem.Rides.Count];
 			for (int stepIndex = 0; stepIndex < _problem.StepCount; stepIndex++)
 			{
+				if (stepIndex % 10000 == 0)
+				{
+					Console.WriteLine($"Step {stepIndex}");
+				}
+
 				_problem.CurrentStep = stepIndex;
-				
-				for (int i = 0; i < vehicles.Count; i++)
+
+				int nodeCount = 0;
+				for (int i = 0, ni = 0; i < _problem.Rides.Count; ++i)
+				{
+					Node n = _rideNodes[i];
+					if (n.Done)
+					{
+						invertNodesMapping[i] = -1;
+						continue;
+					}
+
+					int arrivalTime = _problem.CurrentStep + n.Ride.Distance;
+					if (arrivalTime >= _problem.StepCount || arrivalTime >= n.Ride.EndStep)
+					{
+						invertNodesMapping[i] = -1;
+						continue;
+					}
+
+					nodesMapping[ni] = i;
+					invertNodesMapping[i] = ni;
+					ni++;
+					nodeCount++;
+				}
+
+				if (nodeCount == 0)
+				{
+					continue;
+				}
+
+				int vCount = 0;
+				for (int i = 0, vi = 0; i < vehicles.Count; i++)
 				{
 					Vehicle v = vehicles[i];
-					if (v.CurrentStep > stepIndex) //la voiture est en avance sur la simulation
+					if (v.CurrentStep > stepIndex || v.Finished) //la voiture est en avance sur la simulation
 					{
-						matrix[i] = _problem.NotUsableScores;
+						continue;
 					}
-					else
+
+					int[] score = v.UpdateNodesScore(invertNodesMapping);
+
+					bool anyGood = false;
+					for (var j = 0; j < nodeCount; j++)
 					{
-						matrix[i] = v.UpdateNodesScore();
+						if (score[j] != Constant.MIN)
+						{
+							anyGood = true;
+							break;
+						}
 					}
-				}
-				/*
-				_solver.SetWeights(matrix);
-				List<int> bests = _solver.Path();
 
-				for (int i = 0; i < bests.Count; i++)
-				{
-					int rideId = bests[i];
-					Vehicle v = vs[i];
-
-					if (rideId < 0)
+					if (!anyGood)
 					{
 						v.Finished = true;
 						continue;
 					}
 
+					matrix[vi] = score;
+					vehiclesMapping[vi] = i;
+					vi++;
+					vCount++;
+				}
 
-					Node startNode = _startNodesRides[rideId];
-					Node endNode = start.Links[0].Item2;
+				if (vCount == 0)
+				{
+					continue;
+				}
+
+				int?[] result = AssignmentProblem.Solve(matrix, vCount, nodeCount);
+				for (int i = 0; i < vCount; ++i)
+				{
+					if (result[i] == null)
+					{
+						continue;
+					}
+					int matrixRideIndex = result[i].Value;
+
+					int rideId = nodesMapping[matrixRideIndex];
+					Vehicle v = vehicles[vehiclesMapping[i]];
+
+					Node rideNode = _rideNodes[rideId];
+					if (rideNode.Done || matrix[i][matrixRideIndex] == Constant.MIN)
+					{
+						v.Finished = true;
+						continue;
+					}
 
 					v.Rides.Add(rideId);
 
-					int distanceToNode = matrix[i][rideId];
-					v.CurrentStep += distanceToNode + startNode.Ride.Distance;
+					int distanceToNode = Distance(v.Node.Ride, rideNode.Ride);
+					v.CurrentStep += distanceToNode + rideNode.Ride.Distance;
 
 					//add waiting time before ride
-					int arrival = _currentStep + distanceToNode;
-					if (arrival < startNode.Ride.StartStep)
+					int arrival = _problem.CurrentStep + distanceToNode;
+					if (arrival < rideNode.Ride.StartStep)
 					{
-						v.CurrentStep += startNode.Ride.StartStep - arrival;
+						v.CurrentStep += rideNode.Ride.StartStep - arrival;
 					}
 
 					//mark start & end node as "Done"
-					v.Node = endNode;
-					endNode.Done = true;
-					startNode.Done = true;
+					v.Node = rideNode;
+					rideNode.Done = true;
 				}
-				*/
 			}
+		}
+
+		public int Score()
+		{
+			int score = 0;
+
+			Dictionary<Vehicle, (int currentStep, int rideIndex, int x, int y)> vehicles = _problem.Vehicles.ToDictionary(x => x, _ => (0, 0, 0, 0));
+
+			for (var step = 0; step < _problem.StepCount; step++)
+			{
+				foreach (Vehicle v in _problem.Vehicles)
+				{
+					(int currentStep, int rideIndex, int x, int y) = vehicles[v];
+					if (step < currentStep || rideIndex >= v.Rides.Count)
+					{
+						continue;
+					}
+
+					int rideId = v.Rides[rideIndex];
+					Ride ride = _problem.Rides[rideId];
+
+					int distanceToRide = Distance(x, y, ride);
+					int arrivalStep = step + distanceToRide;
+					int endStep = step + distanceToRide + ride.Distance;
+
+					if (arrivalStep <= ride.StartStep)
+					{
+						score += _problem.Bonus;
+						endStep += (ride.StartStep - arrivalStep);
+					}
+
+					score += ride.Distance;
+					
+					vehicles[v] = (endStep, rideIndex + 1, ride.EndX, ride.EndY);
+				}
+			}
+
+			return score;
 		}
 
 		public static int DistanceStart(Ride r)
@@ -386,7 +519,15 @@ namespace HashCode2018
 
 		public static int Distance(Ride source, Ride dest)
 		{
-			return Math.Abs(source.EndX - dest.StartX) + Math.Abs(source.EndY - dest.StartY);
+			int endX = source?.EndX ?? 0;
+			int endY = source?.EndY ?? 0;
+
+			return Math.Abs(endX - dest.StartX) + Math.Abs(endY - dest.StartY);
+		}
+
+		public static int Distance(int endX, int endY, Ride dest)
+		{
+			return Math.Abs(endX - dest.StartX) + Math.Abs(endY - dest.StartY);
 		}
 
 		public static int Distance(Ride r)
@@ -394,320 +535,4 @@ namespace HashCode2018
 			return Math.Abs(r.EndX - r.StartX) + Math.Abs(r.EndY - r.StartY);
 		}
 	}
-
-	public class SolverNode
-	{
-		public SolverNode()
-		{
-			Links = new List<SolverNode>();
-		}
-
-		public Ride Ride;
-
-		public bool IsUsable => Weight == -100_000_000;
-
-		public int Weight { get; set; }
-
-		public int Cost { get; set; }
-
-		public bool IsOpened { get; set; }
-
-		public SolverNode Backtrack { get; set; }
-
-		public List<SolverNode> Links { get; set; }
-	}
-
-	public class HungarianSolver
-	{
-		private readonly int _vehiclesCount;
-		private readonly int _ridesCount;
-		private long[,] _matrix;
-		private bool[,] _covering;
-
-		public HungarianSolver(int vehiclesCount, int ridesCount)
-		{
-			_vehiclesCount = vehiclesCount;
-			_ridesCount = ridesCount;
-			_matrix = new long[vehiclesCount,ridesCount];
-			_covering = new bool[vehiclesCount,ridesCount];
-		}
-
-		public void Set(int[][] weights)
-		{
-			for (int vi = 0; vi < _vehiclesCount; vi++)
-			{
-				for (int ri = 0; ri < _ridesCount; ri++)
-				{
-					_covering[vi, ri] = false;
-					_matrix[vi, ri] = int.MaxValue - (weights[vi][ri] + Constant.MIN);
-				}
-			}
-		}
-
-		public void Solve()
-		{
-			//Step 1 => foreach rows, substract the min element to each element
-			for (int vi = 0; vi < _vehiclesCount; vi++)
-			{
-				long min = long.MaxValue;
-				for (int ri = 0; ri < _ridesCount; ri++)
-				{
-					if (_matrix[vi, ri] < min)
-					{
-						min = _matrix[vi, ri];
-					}
-				}
-				
-				for (int ri = 0; ri < _ridesCount; ri++)
-				{
-					_matrix[vi, ri] -= min;
-				}
-			}
-		}
-	}
-	
-	public sealed class HungarianAlgorithm
-    {
-        private readonly int[,] _costMatrix;
-        private int _inf;
-        private int _n; //number of elements
-        private int[] _lx; //labels for workers
-        private int[] _ly; //labels for jobs 
-        private bool[] _s;
-        private bool[] _t;
-        private int[] _matchX; //vertex matched with x
-        private int[] _matchY; //vertex matched with y
-        private int _maxMatch;
-        private int[] _slack;
-        private int[] _slackx;
-        private int[] _prev; //memorizing paths
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="costMatrix"></param>
-        public HungarianAlgorithm(int[,] costMatrix)
-        {
-            _costMatrix = costMatrix;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public int[] Run()
-        {
-            _n = _costMatrix.GetLength(0);
-
-            _lx = new int[_n];
-            _ly = new int[_n];
-            _s = new bool[_n];
-            _t = new bool[_n];
-            _matchX = new int[_n];
-            _matchY = new int[_n];
-            _slack = new int[_n];
-            _slackx = new int[_n];
-            _prev = new int[_n];
-            _inf = int.MaxValue;
-
-
-            InitMatches();
-
-            if (_n != _costMatrix.GetLength(1))
-                return null;
-
-            InitLbls();
-
-            _maxMatch = 0;
-
-            InitialMatching();
-
-            var q = new Queue<int>();
-
-            #region augment
-
-            while (_maxMatch != _n)
-            {
-                q.Clear();
-
-                InitSt();
-                //Array.Clear(S,0,n);
-                //Array.Clear(T, 0, n);
-
-
-                //parameters for keeping the position of root node and two other nodes
-                var root = 0;
-                int x;
-                var y = 0;
-
-                //find root of the tree
-                for (x = 0; x < _n; x++)
-                {
-                    if (_matchX[x] != -1) continue;
-                    q.Enqueue(x);
-                    root = x;
-                    _prev[x] = -2;
-
-                    _s[x] = true;
-                    break;
-                }
-
-                //init slack
-                for (var i = 0; i < _n; i++)
-                {
-                    _slack[i] = _costMatrix[root, i] - _lx[root] - _ly[i];
-                    _slackx[i] = root;
-                }
-
-                //finding augmenting path
-                while (true)
-                {
-                    while (q.Count != 0)
-                    {
-                        x = q.Dequeue();
-                        var lxx = _lx[x];
-                        for (y = 0; y < _n; y++)
-                        {
-                            if (_costMatrix[x, y] != lxx + _ly[y] || _t[y]) continue;
-                            if (_matchY[y] == -1) break; //augmenting path found!
-                            _t[y] = true;
-                            q.Enqueue(_matchY[y]);
-
-                            AddToTree(_matchY[y], x);
-                        }
-                        if (y < _n) break; //augmenting path found!
-                    }
-                    if (y < _n) break; //augmenting path found!
-                    UpdateLabels(); //augmenting path not found, update labels
-
-                    for (y = 0; y < _n; y++)
-                    {
-                        //in this cycle we add edges that were added to the equality graph as a
-                        //result of improving the labeling, we add edge (slackx[y], y) to the tree if
-                        //and only if !T[y] &&  slack[y] == 0, also with this edge we add another one
-                        //(y, yx[y]) or augment the matching, if y was exposed
-
-                        if (_t[y] || _slack[y] != 0) continue;
-                        if (_matchY[y] == -1) //found exposed vertex-augmenting path exists
-                        {
-                            x = _slackx[y];
-                            break;
-                        }
-                        _t[y] = true;
-                        if (_s[_matchY[y]]) continue;
-                        q.Enqueue(_matchY[y]);
-                        AddToTree(_matchY[y], _slackx[y]);
-                    }
-                    if (y < _n) break;
-                }
-
-                _maxMatch++;
-
-                //inverse edges along the augmenting path
-                int ty;
-                for (int cx = x, cy = y; cx != -2; cx = _prev[cx], cy = ty)
-                {
-                    ty = _matchX[cx];
-                    _matchY[cy] = cx;
-                    _matchX[cx] = cy;
-                }
-            }
-
-            #endregion
-
-            return _matchX;
-        }
-
-        private void InitMatches()
-        {
-            for (var i = 0; i < _n; i++)
-            {
-                _matchX[i] = -1;
-                _matchY[i] = -1;
-            }
-        }
-
-        private void InitSt()
-        {
-            for (var i = 0; i < _n; i++)
-            {
-                _s[i] = false;
-                _t[i] = false;
-            }
-        }
-
-        private void InitLbls()
-        {
-            for (var i = 0; i < _n; i++)
-            {
-                var minRow = _costMatrix[i, 0];
-                for (var j = 0; j < _n; j++)
-                {
-                    if (_costMatrix[i, j] < minRow) minRow = _costMatrix[i, j];
-                    if (minRow == 0) break;
-                }
-                _lx[i] = minRow;
-            }
-            for (var j = 0; j < _n; j++)
-            {
-                var minColumn = _costMatrix[0, j] - _lx[0];
-                for (var i = 0; i < _n; i++)
-                {
-                    if (_costMatrix[i, j] - _lx[i] < minColumn) minColumn = _costMatrix[i, j] - _lx[i];
-                    if (minColumn == 0) break;
-                }
-                _ly[j] = minColumn;
-            }
-        }
-
-        private void UpdateLabels()
-        {
-            var delta = _inf;
-            for (var i = 0; i < _n; i++)
-                if (!_t[i])
-                    if(delta>_slack[i])
-                        delta = _slack[i];
-            for (var i = 0; i < _n; i++)
-            {
-                if (_s[i])
-                    _lx[i] = _lx[i] + delta;
-                if (_t[i])
-                    _ly[i] = _ly[i] - delta;
-                else _slack[i] = _slack[i] - delta;
-            }
-        }
-
-        private void AddToTree(int x, int prevx)
-        {
-            //x-current vertex, prevx-vertex from x before x in the alternating path,
-            //so we are adding edges (prevx, matchX[x]), (matchX[x],x)
-
-            _s[x] = true; //adding x to S
-            _prev[x] = prevx;
-
-            var lxx = _lx[x];
-            //updateing slack
-            for (var y = 0; y < _n; y++)
-            {
-                if (_costMatrix[x, y] - lxx - _ly[y] >= _slack[y]) continue;
-                _slack[y] = _costMatrix[x, y] - lxx - _ly[y];
-                _slackx[y] = x;
-            }
-        }
-
-        private void InitialMatching()
-        {
-            for (var x = 0; x < _n; x++)
-            {
-                for (var y = 0; y < _n; y++)
-                {
-                    if (_costMatrix[x, y] != _lx[x] + _ly[y] || _matchY[y] != -1) continue;
-                    _matchX[x] = y;
-                    _matchY[y] = x;
-                    _maxMatch++;
-                    break;
-                }
-            }
-        }
-    }
 }
