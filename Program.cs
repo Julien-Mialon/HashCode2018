@@ -6,129 +6,183 @@ using System.Net.Security;
 
 namespace HashCode2018
 {
-	public class Program
-	{
-		private const string FILE = "a_example.in";
+    public class Program
+    {
+        private const string FILE = "a_example.in";
 
-		private static readonly List<string> _files = new List<string>
-		{
-			//"a_example.in",
-			"b_should_be_easy.in",
-			//"c_no_hurry.in",
-			//"d_metropolis.in",
-			//"e_high_bonus.in"
-		};
+        private static readonly List<string> _files = new List<string>
+        {
+            "a_example.in",
+            "b_should_be_easy.in",
+            "c_no_hurry.in",
+            "d_metropolis.in",
+            "e_high_bonus.in"
+        };
 
-		static void RunFile(string file)
-		{
-			Console.WriteLine($"Start {file}");
+        static int RunFile(string file)
+        {
+            Console.WriteLine($"Start {file}");
 
-			Problem problem = Input(file);
+            Problem problem = Input(file);
 
-			Solution solution = new Solution(problem);
-			solution.Solve();
+            Solution solution = new Solution(problem);
+            solution.Solve();
 
-			Output(file, problem.Vehicles);
+            Output(file, problem.Vehicles);
 
-			Console.WriteLine($"Done {file}!");
-		}
+            Console.WriteLine($"Done {file}!");
+            return Visualize(problem);
+        }
 
-		static void Main(string[] args)
-		{
-			_files.AsParallel().ForAll(RunFile);
-		}
+        static int Visualize(Problem problem)
+        {
+            var startRide = new Ride(-1, 0, 0, 0, 0, 0, 1);
+            int point = 0;
+            foreach (var vehicle in problem.Vehicles)
+            {
+                int currentStep = 0;
+                var currentRide = startRide;
+                foreach (var ride in vehicle.Rides)
+                {
+                    var distanceToRide = currentRide.DistanceToRide(ride);
+                    var distanceOfRide = ride.Distance;
+                    var bonus = (currentStep + distanceToRide) <= ride.StartStep ? problem.Bonus : 0;
+                    var attente = Math.Max(ride.StartStep - (currentStep + distanceToRide), 0);
+                    currentRide = ride;
+                    currentStep += distanceToRide + attente + distanceOfRide;
+                    point += distanceOfRide + bonus;
+                }
+            }
 
-		static Problem Input(string file)
-		{
-			const int HEADER_COUNT = 1;
-			string[] lines = ReadFile(file);
+            return point;
+        }
 
-			List<int> values = lines[0].Split(' ').Select(int.Parse).ToList();
-			Problem result = new Problem
-			{
-				Bonus = values[4],
-				StepCount = values[5]
-			};
-			result.Vehicles.AddRange(Enumerable.Range(0, values[2]).Select(_ => new Vehicle()));
+        static void Main(string[] args)
+        {
+            var point = _files.AsParallel().Sum(RunFile);
+            Console.WriteLine(point);
+            Console.ReadLine();
+        }
 
-			int counter = 0;
-			foreach (string line in lines.Skip(HEADER_COUNT))
-			{
-				values = line.Split(' ').Select(int.Parse).ToList();
-				result.Rides.Add(new Ride(counter++, values[0], values[1], values[2], values[3], values[4], values[5]));
-			}
+        static Problem Input(string file)
+        {
+            const int HEADER_COUNT = 1;
+            string[] lines = ReadFile(file);
 
-			return result;
-		}
+            List<int> values = lines[0].Split(' ').Select(int.Parse).ToList();
+            Problem result = new Problem
+            {
+                Bonus = values[4],
+                StepCount = values[5]
+            };
+            result.Vehicles.AddRange(Enumerable.Range(0, values[2]).Select(_ => new Vehicle()));
 
-		static void Output(string file, List<Vehicle> data)
-		{
-			List<string> lines = data.Select(x => $"{x.Rides.Count} {string.Join(" ", x.Rides.Select(ride => ride.Id))}").ToList();
+            int counter = 0;
+            foreach (string line in lines.Skip(HEADER_COUNT))
+            {
+                values = line.Split(' ').Select(int.Parse).ToList();
+                result.Rides.Add(new Ride(counter++, values[0], values[1], values[2], values[3], values[4], values[5]));
+            }
 
-			WriteFile(file, lines);
-		}
+            return result;
+        }
 
-		static string[] ReadFile(string file)
-		{
-			return File.ReadAllLines(file);
-		}
+        static void Output(string file, List<Vehicle> data)
+        {
+            List<string> lines = data.Select(x => $"{x.Rides.Count} {string.Join(" ", x.Rides.Select(ride => ride.Id))}").ToList();
 
-		static void WriteFile(string file, List<string> lines)
-		{
-			File.WriteAllText($"{file}.out", string.Join("\n", lines));
-		}
-	}
+            WriteFile(file, lines);
+        }
 
-	public class Solution
-	{
-		private readonly Problem _problem;
+        static string[] ReadFile(string file)
+        {
+            return File.ReadAllLines(file);
+        }
 
-		public Solution(Problem problem)
-		{
-			_problem = problem;
-		}
+        static void WriteFile(string file, List<string> lines)
+        {
+            File.WriteAllText($"{file}.out", string.Join("\n", lines));
+        }
+    }
 
-		public void Solve()
-		{
-			//Init
-			var startRide = new Ride(-1, 0, 0, 0, 0, 0, 1);
-			foreach (var currentRide in _problem.Rides)
-			{
-				startRide.AddNextRide(currentRide);
-				foreach (var ride in _problem.Rides)
-				{
-					currentRide.AddNextRide(ride);
-				}
-			}
+    public class Solution
+    {
+        private readonly Problem _problem;
 
-			//Tour de jeu
-			foreach (var vehicle in _problem.Vehicles)
-			{
-				vehicle.CurrentRide = startRide;
-				vehicle.CurrentStep = 0;
+        public Solution(Problem problem)
+        {
+            _problem = problem;
+        }
 
-				while (true)
-				{
-					var usableRide = vehicle.CurrentRide.NextRideList.Where(tuple => tuple.Item2.IsUsable(vehicle));
-					var (distance, nextRide) = usableRide.OrderBy(tuple => Score(tuple.Item2, vehicle, _problem.Bonus)).FirstOrDefault();
-					if (nextRide == null)
-					{
-						break;
-					}
+        public void Solve()
+        {
+            //Init
+            var startRide = new Ride(-1, 0, 0, 0, 0, 0, 1);
+            foreach (var currentRide in _problem.Rides)
+            {
+                startRide.AddNextRide(currentRide);
+                foreach (var ride in _problem.Rides)
+                {
+                    currentRide.AddNextRide(ride);
+                }
+            }
+            foreach (var vehicle in _problem.Vehicles)
+            {
+                vehicle.CurrentRide = startRide;
+                vehicle.CurrentStep = 0;
+            }
 
-					vehicle.ToNextRide(nextRide);
-				}
-			}
-		}
+            //Tour de jeu
+            if (_problem.Bonus > _problem.Rides.Count / 30)
+            {
+                for (var currentStep = 0; currentStep < _problem.StepCount; currentStep++)
+                {
+                    var usableVehicle = _problem.Vehicles.AsParallel().Where(x => !x.Finished).ToList();
+                    if (usableVehicle.Count == 0)
+                    {
+                        break;
+                    }
+                    foreach (var vehicle in usableVehicle)
+                    {
+                        var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(ride => ride.IsUsable(vehicle)).ToList();
+                        if (usableRide.Count == 0)
+                        {
+                            vehicle.Finished = true;
+                            continue;
+                        }
+                        var nextRide = usableRide.OrderByDescending(ride => Score(ride, vehicle, _problem.Bonus)).FirstOrDefault();
 
-		public int Score(Ride ride, Vehicle vehicle, int bonusPoint)
-		{
-			var distanceToNextRide = vehicle.CurrentRide.DistanceToRide(ride);
-			var distanceOfRide = ride.Distance;
-			var deltaStart = ride.StartStep - (vehicle.CurrentStep + distanceToNextRide);
-			var attente = Math.Max(deltaStart, 0);
-			var bonus = deltaStart == 0 ? bonusPoint : 0;
-			return distanceOfRide + bonus - attente - distanceToNextRide;
-		}
-	}
+                        vehicle.ToNextRide(nextRide);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var vehicle in _problem.Vehicles)
+                {
+                    while (true)
+                    {
+                        var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(ride => ride.IsUsable(vehicle));
+                        var nextRide = usableRide.OrderByDescending(ride => Score(ride, vehicle, _problem.Bonus)).FirstOrDefault();
+                        if (nextRide == null)
+                        {
+                            break;
+                        }
+
+                        vehicle.ToNextRide(nextRide);
+                    }
+                }
+            }
+        }
+
+        public int Score(Ride ride, Vehicle vehicle, int bonusPoint)
+        {
+            var distanceToNextRide = vehicle.CurrentRide.DistanceToRide(ride);
+            var distanceOfRide = ride.Distance;
+            var deltaStart = ride.StartStep - (vehicle.CurrentStep + distanceToNextRide);
+            var attente = Math.Max(deltaStart, 0);
+            var bonus = deltaStart == 0 ? bonusPoint : 0;
+            return distanceOfRide - distanceToNextRide + (bonus - attente);
+        }
+    }
 }

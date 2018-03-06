@@ -33,7 +33,7 @@ namespace HashCode2018
 
 		public bool Done { get; set; }
 
-		public List<(int, Ride)> NextRideList { get; }
+		public List<Ride> NextRideList { get; }
 
 		public Ride(int id, int startX, int startY, int endX, int endY, int startStep, int endStep)
 		{
@@ -45,12 +45,12 @@ namespace HashCode2018
 			StartStep = startStep;
 			EndStep = endStep;
 			Distance = Math.Abs(startX - endX) + Math.Abs(startY - endY);
-			NextRideList = new List<(int, Ride)>();
+			NextRideList = new List<Ride>();
 		}
 
 		public void AddNextRide(Ride r)
 		{
-			NextRideList.Add((DistanceToRide(r), r));
+			NextRideList.Add(r);
 		}
 
 		public int DistanceToRide(Ride r)
@@ -60,7 +60,8 @@ namespace HashCode2018
 
 		public bool IsUsable(Vehicle vehicle)
 		{
-			return !Done && vehicle.CurrentStep + vehicle.CurrentRide.DistanceToRide(this) + Distance < EndStep;
+		    var distanceToNextRide = vehicle.CurrentRide.DistanceToRide(this);
+			return !Done && vehicle.CurrentStep + distanceToNextRide + Distance < EndStep;
 		}
 	}
 
@@ -71,6 +72,8 @@ namespace HashCode2018
 		public Ride CurrentRide { get; set; }
 
 		public List<Ride> Rides { get; }
+
+        public bool Finished { get; set; }
 
 		public Vehicle()
 		{
