@@ -12,12 +12,12 @@ namespace HashCode2018
 
 		private static readonly List<string> _files = new List<string>
 		{
-			"a_example.in",
-			"b_should_be_easy.in",
-			"c_no_hurry.in",
-			"d_metropolis.in",
-			"e_high_bonus.in"
-		};
+            "a_example.in",
+            "b_should_be_easy.in",
+            "c_no_hurry.in",
+            "d_metropolis.in",
+            "e_high_bonus.in"
+        };
 
 		static int RunFile(string file)
 		{
@@ -147,14 +147,14 @@ namespace HashCode2018
 
 					foreach (var vehicle in usableVehicle)
 					{
-						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.ride.IsUsable(vehicle)).ToList();
+						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Value.IsUsable(vehicle)).ToList();
 						if (usableRide.Count == 0)
 						{
 							vehicle.Finished = true;
 							continue;
 						}
 
-						var ( _, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.ride, vehicle, _problem.Bonus)).FirstOrDefault();
+						var ( _, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Value, vehicle, _problem.Bonus)).FirstOrDefault();
 
 						vehicle.ToNextRide(nextRide);
 					}
@@ -166,8 +166,8 @@ namespace HashCode2018
 				{
 					while (true)
 					{
-						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.ride.IsUsable(vehicle));
-						var(_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.ride, vehicle, _problem.Bonus)).FirstOrDefault();
+						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Value.IsUsable(vehicle));
+						var(_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Value, vehicle, _problem.Bonus)).FirstOrDefault();
 						if (nextRide == null)
 						{
 							break;
@@ -186,8 +186,8 @@ namespace HashCode2018
 			var deltaStart = ride.StartStep - (vehicle.CurrentStep + distanceToNextRide);
 			var attente = Math.Max(deltaStart, 0);
 			var bonus = deltaStart == 0 ? bonusPoint : 0;
-			var malus = ride.NextRideList.AsParallel().Where(tuple => !tuple.ride.Done).Min(tuple => tuple.distance);
-			return distanceOfRide - distanceToNextRide - malus + (bonus - attente);
+		    var malus = ride.NextRideList.FirstOrDefault(tuple => !tuple.Value.Done).Key;
+            return distanceOfRide - distanceToNextRide - malus + (bonus - attente);
 		}
 	}
 }

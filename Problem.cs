@@ -3,92 +3,102 @@ using System.Collections.Generic;
 
 namespace HashCode2018
 {
-	public class Problem
-	{
-		public int Bonus { get; set; }
+    public class Problem
+    {
+        public int Bonus { get; set; }
 
-		public int StepCount { get; set; }
+        public int StepCount { get; set; }
 
-		public List<Ride> Rides { get; }
+        public List<Ride> Rides { get; }
 
-		public List<Vehicle> Vehicles { get; }
+        public List<Vehicle> Vehicles { get; }
 
-		public Problem()
-		{
-			Rides = new List<Ride>();
-			Vehicles = new List<Vehicle>();
-		}
-	}
+        public Problem()
+        {
+            Rides = new List<Ride>();
+            Vehicles = new List<Vehicle>();
+        }
+    }
 
-	public class Ride
-	{
-		public int Id { get; }
-		public int StartX { get; }
-		public int StartY { get; }
-		public int EndX { get; }
-		public int EndY { get; }
-		public int StartStep { get; }
-		public int EndStep { get; }
-		public int Distance { get; }
+    public class Ride
+    {
+        public int Id { get; }
+        public int StartX { get; }
+        public int StartY { get; }
+        public int EndX { get; }
+        public int EndY { get; }
+        public int StartStep { get; }
+        public int EndStep { get; }
+        public int Distance { get; }
 
-		public bool Done { get; set; }
+        public bool Done { get; set; }
 
-		public List<(int distance, Ride ride)> NextRideList { get; }
+        public SortedList<int, Ride> NextRideList { get; }
 
-		public Ride(int id, int startX, int startY, int endX, int endY, int startStep, int endStep)
-		{
-			Id = id;
-			StartX = startX;
-			StartY = startY;
-			EndX = endX;
-			EndY = endY;
-			StartStep = startStep;
-			EndStep = endStep;
-			Distance = Math.Abs(startX - endX) + Math.Abs(startY - endY);
-			NextRideList = new List<(int, Ride)>();
-		}
+        public Ride(int id, int startX, int startY, int endX, int endY, int startStep, int endStep)
+        {
+            Id = id;
+            StartX = startX;
+            StartY = startY;
+            EndX = endX;
+            EndY = endY;
+            StartStep = startStep;
+            EndStep = endStep;
+            Distance = Math.Abs(startX - endX) + Math.Abs(startY - endY);
+            NextRideList = new SortedList<int, Ride>(new DuplicateKeyComparer<int>());
+        }
 
-		public void AddNextRide(Ride r)
-		{
-			NextRideList.Add((DistanceToRide(r), r));
-		}
+        private class DuplicateKeyComparer<TKey> : IComparer<TKey> where TKey : IComparable
+        {
+            public int Compare(TKey x, TKey y)
+            {
+                int result = x.CompareTo(y);
 
-		public int DistanceToRide(Ride r)
-		{
-			return Math.Abs(EndX - r.StartX) + Math.Abs(EndY - r.StartY);
-		}
+                return result == 0 ? 1 : result;
+            }
+        }
 
-		public bool IsUsable(Vehicle vehicle)
-		{
-			var distanceToNextRide = vehicle.CurrentRide.DistanceToRide(this);
-			return !Done && vehicle.CurrentStep + distanceToNextRide + Distance < EndStep;
-		}
-	}
+        public void AddNextRide(Ride r)
+        {
+            NextRideList.Add(DistanceToRide(r), r);
+        }
 
-	public class Vehicle
-	{
-		public int CurrentStep { get; set; }
+        public int DistanceToRide(Ride r)
+        {
+            return Math.Abs(EndX - r.StartX) + Math.Abs(EndY - r.StartY);
+        }
 
-		public Ride CurrentRide { get; set; }
+        public bool IsUsable(Vehicle vehicle)
+        {
+            var distanceToNextRide = vehicle.CurrentRide.DistanceToRide(this);
+            return !Done && vehicle.CurrentStep + distanceToNextRide + Distance < EndStep;
+        }
+    }
 
-		public List<Ride> Rides { get; }
+    public class Vehicle
+    {
+        public int CurrentStep { get; set; }
 
-		public bool Finished { get; set; }
+        public Ride CurrentRide { get; set; }
 
-		public Vehicle()
-		{
-			Rides = new List<Ride>();
-		}
+        public List<Ride> Rides { get; }
 
-		public void ToNextRide(Ride nextRide)
-		{
-			var distanceToNextRide = CurrentRide.DistanceToRide(nextRide);
-			var distanceOfNextRide = nextRide.Distance;
-			var attente = Math.Max(nextRide.StartStep - (CurrentStep + distanceToNextRide), 0);
-			CurrentStep += distanceOfNextRide + attente + distanceToNextRide;
-			Rides.Add(nextRide);
-			CurrentRide = nextRide;
-			nextRide.Done = true;
-		}
-	}
+        public bool Finished { get; set; }
+
+        public Vehicle()
+        {
+            Rides = new List<Ride>();
+        }
+
+        public void ToNextRide(Ride nextRide)
+        {
+            var distanceToNextRide = CurrentRide.DistanceToRide(nextRide);
+            var distanceOfNextRide = nextRide.Distance;
+            var attente = Math.Max(nextRide.StartStep - (CurrentStep + distanceToNextRide), 0);
+            CurrentStep += distanceOfNextRide + attente + distanceToNextRide;
+            Rides.Add(nextRide);
+            CurrentRide = nextRide;
+            nextRide.Done = true;
+        }
+    }
 }
