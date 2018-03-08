@@ -12,12 +12,12 @@ namespace HashCode2018
 
 		private static readonly List<string> _files = new List<string>
 		{
-            "a_example.in",
-            "b_should_be_easy.in",
-            "c_no_hurry.in",
-            "d_metropolis.in",
-            "e_high_bonus.in"
-        };
+			"a_example.in",
+			"b_should_be_easy.in",
+			"c_no_hurry.in",
+			"d_metropolis.in",
+			"e_high_bonus.in"
+		};
 
 		static int RunFile(string file)
 		{
@@ -122,11 +122,10 @@ namespace HashCode2018
 			foreach (var currentRide in _problem.Rides)
 			{
 				startRide.AddNextRide(currentRide);
-				foreach (var ride in _problem.Rides)
-				{
-					currentRide.AddNextRide(ride);
-				}
+				currentRide.AddNextRide(_problem.Rides);
+				currentRide.SortNextRideList();
 			}
+			startRide.SortNextRideList();
 
 			foreach (var vehicle in _problem.Vehicles)
 			{
@@ -147,14 +146,14 @@ namespace HashCode2018
 
 					foreach (var vehicle in usableVehicle)
 					{
-						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Value.IsUsable(vehicle)).ToList();
+						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Item2.IsUsable(vehicle)).ToList();
 						if (usableRide.Count == 0)
 						{
 							vehicle.Finished = true;
 							continue;
 						}
 
-						var ( _, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Value, vehicle, _problem.Bonus)).FirstOrDefault();
+						var ( _, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Item2, vehicle, _problem.Bonus, _problem.StepCount - 1)).FirstOrDefault();
 
 						vehicle.ToNextRide(nextRide);
 					}
@@ -166,8 +165,8 @@ namespace HashCode2018
 				{
 					while (true)
 					{
-						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Value.IsUsable(vehicle));
-						var(_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Value, vehicle, _problem.Bonus)).FirstOrDefault();
+						var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Item2.IsUsable(vehicle));
+						var(_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Item2, vehicle, _problem.Bonus, _problem.StepCount - 1)).FirstOrDefault();
 						if (nextRide == null)
 						{
 							break;
@@ -179,15 +178,16 @@ namespace HashCode2018
 			}
 		}
 
-		public int Score(Ride ride, Vehicle vehicle, int bonusPoint)
+		public int Score(Ride ride, Vehicle vehicle, int bonusPoint, int endStep)
 		{
 			var distanceToNextRide = vehicle.CurrentRide.DistanceToRide(ride);
 			var distanceOfRide = ride.Distance;
 			var deltaStart = ride.StartStep - (vehicle.CurrentStep + distanceToNextRide);
 			var attente = Math.Max(deltaStart, 0);
 			var bonus = deltaStart == 0 ? bonusPoint : 0;
-		    var malus = ride.NextRideList.FirstOrDefault(tuple => !tuple.Value.Done).Key;
-            return distanceOfRide - distanceToNextRide - malus + (bonus - attente);
+//			var malus = Math.Max(ride.NextRideList.FirstOrDefault(tuple => !tuple.Item2.Done).Item1, endStep);
+			var malus = ride.NextRideList.FirstOrDefault(tuple => !tuple.Item2.Done).Item1;
+			return distanceOfRide - distanceToNextRide - malus + (bonus - attente);
 		}
 	}
 }
