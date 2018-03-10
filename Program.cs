@@ -13,12 +13,12 @@ namespace HashCode2018
 
         private static readonly List<string> _files = new List<string>
         {
-            //"a_example.in",
-            //"b_should_be_easy.in",
-            //"c_no_hurry.in",
-            "d_metropolis.in",
-            //"e_high_bonus.in"
-        };
+			"a_example.in",
+			"b_should_be_easy.in",
+			"c_no_hurry.in",
+			"d_metropolis.in",
+			"e_high_bonus.in"
+		};
 
         static int RunFile(string file)
         {
@@ -132,7 +132,7 @@ namespace HashCode2018
             {
                 var ride = _problem.Rides[index];
                 startStep[index] = ride.StartStep + 1;
-                endStep[index] = ride.EndStep + 1;
+                endStep[index] = Math.Min(ride.EndStep + 1, _problem.StepCount);
                 distance[index] = ride.Distance;
                 distanceFrom0[index] = startRide.DistanceToRide(ride);
                 distanceBetwenRide[index] = new int[_problem.Rides.Count];
@@ -156,33 +156,32 @@ namespace HashCode2018
 
         static string ArrayToString(int[][] array)
         {
-            string res = "[|";
-            foreach (var inArray in array)
-            {
-                for (var j = 0; j < inArray.Length - 1; j++)
-                {
-                    res += $"{inArray[j]},";
-                }
+			var res = new StringBuilder();
+            res.AppendLine("[|");
+			for (int i = 0; i < array.Length; i++)
+			{
+				var inArray = array[i];
+				res.Append(string.Join(", ", inArray));
+				if (i == array.Length - 1)
+				{
+					res.Append("|]");
+				} else
+				{
+					res.AppendLine("|");
+				}
+			}
 
-                res += $"{inArray[inArray.Length - 1]}|";
-            }
-
-            res += "]";
-
-            return res;
+            return res.ToString();
         }
 
         static string ArrayToString(int[] array)
         {
-            string res = "[";
-            for (var index = 0; index < array.Length - 1; index++)
-            {
-                res += $"{array[index]},";
-            }
+			var res = new StringBuilder();
+            res.Append("[");
+			res.Append(string.Join(",", array));
+            res.Append("]");
 
-            res += $"{array[array.Length - 1]}]";
-
-            return res;
+            return res.ToString();
         }
 
         //public void Solve()

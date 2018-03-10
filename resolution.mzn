@@ -22,6 +22,9 @@ var int: score;
 
 %constraint
 
+%casser les symétries
+constraint forall(v in 2..nbVehicule)(firstTrip[v]>firstTrip[v-1]);
+
 %Le premier trajet doit être pris est affecté au bon véhicule
 constraint forall(v in 1..nbVehicule)(trajetTaken[v,firstTrip[v]] /\ corresTrajetVehicule[firstTrip[v]]==v);
 
@@ -58,7 +61,11 @@ constraint forall(v in 1..nbVehicule, t in 1..nbTrajet)(trajetTaken[v,t]-> traje
 %maximiser somme pour chaque vehicule pour chaque trajet si trajetTaken[vehicule, trajet] alors distance[trajet]+startTime[vehicule,trajet]==startStep[trajet]?bonus:0 sinon 0
 constraint score=sum(v in 1..nbVehicule, t in 1..nbTrajet)(if(trajetTaken[v,t]) then distance[t]+if(startTime[v,t]==startStep[t])then bonus else 0 endif else 0 endif);
 
-solve ::int_search(corresTrajetVehicule, first_fail, indomain, complete) maximize(score);
+constraint score >=176877;
+
+%solve ::int_search(corresTrajetVehicule, first_fail, indomain, complete) maximize(score);
+solve satisfy;
+%solve maximize(score);
 
 %print cette somme
 output["Score :", show(score),"\n Corres",show(corresTrajetVehicule),"\n TrajetTaken",show(trajetTaken), "\n StartTime",show(startTime),"\n EndTime",show(endTime),"\n PrecTrajet",show(precTrajet),"\n FirstTrip",show(firstTrip)];
