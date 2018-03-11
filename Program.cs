@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
 
@@ -9,16 +10,14 @@ namespace HashCode2018
 {
     public class Program
     {
-        private const string FILE = "a_example.in";
-
         private static readonly List<string> _files = new List<string>
         {
-			"a_example.in",
-			"b_should_be_easy.in",
-			"c_no_hurry.in",
-			"d_metropolis.in",
-			"e_high_bonus.in"
-		};
+            "a_example.in",
+            "b_should_be_easy.in",
+            "c_no_hurry.in",
+            "d_metropolis.in",
+            "e_high_bonus.in"
+        };
 
         static int RunFile(string file)
         {
@@ -27,15 +26,16 @@ namespace HashCode2018
             Problem problem = Input(file);
 
             Solution solution = new Solution(problem);
-            solution.Solve($"{file}.dzn");
-            Console.WriteLine($"Done {file}!");
-            return 0;
+            //solution.Solve($"{file}.dzn");
+            //Console.WriteLine($"Done {file}!");
+            //return 0;
 
-            //Output(file, problem.Vehicles);
+            solution.Solve();
+            Output(file, problem.Vehicles);
 
-            //var point = Visualize(problem);
-            //Console.WriteLine($"Done {file} {point}!");
-            //return point;
+            var point = Visualize(problem);
+            Console.WriteLine($"Done {file} {point}!");
+            return point;
         }
 
         static int Visualize(Problem problem)
@@ -119,7 +119,8 @@ namespace HashCode2018
             _problem = problem;
         }
 
-        public void Solve(string fileName)
+        #region Constraint Programming
+        public void PrepareDataConstraint(string fileName)
         {
             Ride startRide = new Ride(-1, 0, 0, 0, 0, 0, 0);
 
@@ -156,96 +157,99 @@ namespace HashCode2018
 
         static string ArrayToString(int[][] array)
         {
-			var res = new StringBuilder();
+            var res = new StringBuilder();
             res.AppendLine("[|");
-			for (int i = 0; i < array.Length; i++)
-			{
-				var inArray = array[i];
-				res.Append(string.Join(", ", inArray));
-				if (i == array.Length - 1)
-				{
-					res.Append("|]");
-				} else
-				{
-					res.AppendLine("|");
-				}
-			}
+            for (int i = 0; i < array.Length; i++)
+            {
+                var inArray = array[i];
+                res.Append(string.Join(", ", inArray));
+                if (i == array.Length - 1)
+                {
+                    res.Append("|]");
+                }
+                else
+                {
+                    res.AppendLine("|");
+                }
+            }
 
             return res.ToString();
         }
 
         static string ArrayToString(int[] array)
         {
-			var res = new StringBuilder();
+            var res = new StringBuilder();
             res.Append("[");
-			res.Append(string.Join(",", array));
+            res.Append(string.Join(",", array));
             res.Append("]");
 
             return res.ToString();
         }
+        #endregion
 
-        //public void Solve()
-        //{
-        //    //Init
-        //    var startRide = new Ride(-1, 0, 0, 0, 0, 0, 1);
-        //    foreach (var currentRide in _problem.Rides)
-        //    {
-        //        startRide.AddNextRide(currentRide);
-        //        currentRide.AddNextRide(_problem.Rides);
-        //        currentRide.SortNextRideList();
-        //    }
-        //    startRide.SortNextRideList();
+        public void Solve()
+        {
+            //Init
+            var startRide = new Ride(-1, 0, 0, 0, 0, 0, 1);
+            foreach (var currentRide in _problem.Rides)
+            {
+                startRide.AddNextRide(currentRide);
+                currentRide.AddNextRide(_problem.Rides);
+                currentRide.SortNextRideList();
+            }
+            startRide.SortNextRideList();
 
-        //    foreach (var vehicle in _problem.Vehicles)
-        //    {
-        //        vehicle.CurrentRide = startRide;
-        //        vehicle.CurrentStep = 0;
-        //    }
 
-        //    //Tour de jeu
-        //    if (_problem.Bonus > _problem.Rides.Count / 30)
-        //    {
-        //        for (var currentStep = 0; currentStep < _problem.StepCount; currentStep++)
-        //        {
-        //            var usableVehicle = _problem.Vehicles.AsParallel().Where(x => !x.Finished).ToList();
-        //            if (usableVehicle.Count == 0)
-        //            {
-        //                break;
-        //            }
+            _problem.Vehicles.AsParallel().ForAll(vehicle =>
+            {
+                vehicle.CurrentRide = startRide;
+                vehicle.CurrentStep = 0;
+            });
 
-        //            foreach (var vehicle in usableVehicle)
-        //            {
-        //                var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Item2.IsUsable(vehicle)).ToList();
-        //                if (usableRide.Count == 0)
-        //                {
-        //                    vehicle.Finished = true;
-        //                    continue;
-        //                }
+            //Tour de jeu
+            if (_problem.Bonus > _problem.Rides.Count / 30)
+            {
+                for (var currentStep = 0; currentStep < _problem.StepCount; currentStep++)
+                {
+                    var usableVehicle = _problem.Vehicles.AsParallel().Where(x => !x.Finished).ToList();
+                    if (usableVehicle.Count == 0)
+                    {
+                        break;
+                    }
 
-        //                var (_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Item2, vehicle, _problem.Bonus, _problem.StepCount - 1)).FirstOrDefault();
+                    foreach (var vehicle in usableVehicle)
+                    {
+                        var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Item2.IsUsable(vehicle)).ToList();
+                        if (usableRide.Count == 0)
+                        {
+                            vehicle.Finished = true;
+                            continue;
+                        }
 
-        //                vehicle.ToNextRide(nextRide);
-        //            }
-        //        }
-        //    }
-        //    else
-        //    {
-        //        foreach (var vehicle in _problem.Vehicles)
-        //        {
-        //            while (true)
-        //            {
-        //                var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Item2.IsUsable(vehicle));
-        //                var (_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Item2, vehicle, _problem.Bonus, _problem.StepCount - 1)).FirstOrDefault();
-        //                if (nextRide == null)
-        //                {
-        //                    break;
-        //                }
+                        var (_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Item2, vehicle, _problem.Bonus, _problem.StepCount - 1)).FirstOrDefault();
 
-        //                vehicle.ToNextRide(nextRide);
-        //            }
-        //        }
-        //    }
-        //}
+                        vehicle.ToNextRide(nextRide);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var vehicle in _problem.Vehicles)
+                {
+                    while (true)
+                    {
+                        var usableRide = vehicle.CurrentRide.NextRideList.AsParallel().Where(tuple => tuple.Item2.IsUsable(vehicle));
+                        var (_, nextRide) = usableRide.OrderByDescending(tuple => Score(tuple.Item2, vehicle, _problem.Bonus, _problem.StepCount - 1)).FirstOrDefault();
+                        if (nextRide == null)
+                        {
+                            break;
+                        }
+
+                        vehicle.ToNextRide(nextRide);
+                    }
+                }
+            }
+        }
 
         public int Score(Ride ride, Vehicle vehicle, int bonusPoint, int endStep)
         {
@@ -257,19 +261,22 @@ namespace HashCode2018
             var endTripStep = vehicle.CurrentStep + distanceToNextRide + distanceOfRide + attente;
             var stepToDo = Math.Max(endStep - endTripStep, 0);
             var minNextStep = ride.NextRideList.FirstOrDefault(tuple => !tuple.Item2.Done).Item1;
-            int malus;
-            if (stepToDo > 20)
-            {
-                malus = minNextStep;
-            }
-            else
-            {
-                malus = 0;
-                distanceToNextRide = 0;
-                attente = 0;
-            }
-
-            return distanceOfRide - distanceToNextRide - malus + (bonus - attente);
+            //int malus;
+            //if (stepToDo >minNextStep)
+            //{
+            //    malus = minNextStep;
+            //}
+            //else
+            //{
+            //    malus = 0;
+            //    distanceToNextRide = 0;
+            //    attente = 0;
+            //}
+            //Many possibilities for many high score :
+            //return -distanceOfRide - distanceToNextRide + (bonus - attente);
+            //return distanceOfRide - distanceToNextRide + (bonus - attente);
+            //return distanceOfRide - distanceToNextRide - malus + (bonus - attente);
+            return -distanceToNextRide + (bonus - attente);
         }
     }
 }
